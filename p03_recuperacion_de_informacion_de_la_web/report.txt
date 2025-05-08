@@ -1,0 +1,251 @@
+En esta práctica hemos realizado lo siguiente:
+
+En primer lugar mediante la búsqueda avanzada de Google, he buscado tres palabras que pudieran mantener relación entre sí como puede ser 'C++', 'USA' y 'Olympics', y he ido copiando links usando una extensión de Firefox que me permitia hacerlo de una manera más sencilla. Cuando tuve una cantidad significativa de enlaces, más concretamente 412, los filtre para eliminar todos aquellos videos de Youtube que no aportan nada, mediante el comando: "grep -v google busqueda.lnk | grep -v youtube | grep "^http" > descargas.lnk", que redujo la cantidad de ficheros a 280, y finalmente fui descargando el contenido de cada página web almacenandolo en un directorio 'html/', haciendo uso de los siguientes comandos:
+```
+rm -r html/*
+while read url
+do
+  FILE=./html/`echo $url | sed -e "s/\//_/g"`.html
+  echo "Descargando $url"
+  wget -A htm,html,txt,shtml -a descargas.log -O $FILE "$url"
+done < descargas.lnk
+```
+
+Por otra parte, me asegure con el comando "find html/ -size 0 -exec rm {} \;" que no quedara ninguna página sin contenido que poder analizar, quedandome así con 111 ficheros finalmente.
+
+Para poder empezar el análisis cree un cuaderno Jupyter en un entorno Python y me descargue las librerías: nltk, beautifulsoup4 y scikit-learn, haciendo uso de comando %pip install <librería>, asímismo me descargue las dependecias de nltk: 'stopwords', 'punkt' y 'punkt_tab', con el comando nltk.download('<dependencia>'), y por último importe las siguiente librerías:
+
+```
+from bs4 import BeautifulSoup
+from nltk import word_tokenize
+from nltk.stem import PorterStemmer
+from nltk.corpus import stopwords
+from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+```
+
+Una vez preparado el terreno para poder empezar a analizar, inicie leyendo todos los ficheros HTML previamente descargados convirtiendolos en texto, ejecutando este fragmento de código:
+
+```
+path = './html'
+translate_table = dict((ord(char), ' ') for char in string.punctuation)
+token_dict = {}
+for subdir, dirs, files in os.walk(path):
+    for file in files:
+        file_path = subdir + os.path.sep + file
+        shakes = open(file_path, 'r')
+        try:
+          html = shakes.read()
+        except Exception:
+          continue
+        text = BeautifulSoup(html).get_text().encode('ascii', 'ignore')
+        lowers = str(text.lower())
+        no_punctuation = lowers.translate(translate_table)
+        token_dict[file] = no_punctuation
+
+len(token_dict)
+
+```
+
+Consiguiendo los 111 ficheros que ahora estan tokenizados.
+
+Pasando ahora al propio procesamiento y tratamiento de esos datos, transformé el texto de los ficheros a coordenadas Tf-Idf (Term Frequency-Inverse Document Frequency), mediante el siguiente fragmento de código:
+```
+
+
+
+
+def process_text(text, stem=True):
+text = text.translate(string.punctuation)
+tokens = word_tokenize(text)
+if stem:
+stemmer = PorterStemmer()
+tokens = [stemmer.stem(t) for t in tokens]
+return tokens
+
+
+stop_words = [process_text(w)[0] for w in stopwords.words('english')]
+vectorizer = TfidfVectorizer(tokenizer=process_text,
+stop_words=stop_words,
+max_df=0.5,
+min_df=0.1,
+lowercase=True)
+tfidf_model = vectorizer.fit_transform(token_dict.values())
+
+
+tfidf_model
+
+```
+
+Obteniendo lo siguiente: "<Compressed Sparse Row sparse matrix of dtype 'float64'
+    with 11325 stored elements and shape (111, 561)>", que es una matriz 111x561, que almacena 11325 números flotantes, que representan a las coordenadas), teniendo la siguiente forma:
+
+array(['0', '000', '1', '10', '100', '11', '12', '13', '14', '15', '16',
+       '17', '18', '19', '2', '20', '2023', '2024', '2026', '21', '22',
+       '23', '24', '25', '26', '27', '28', '29', '3', '30', '31', '32',
+       '35', '36', '4', '40', '49', '5', '50', '500', '6', '7', '8', '9',
+       'access', 'account', 'achiev', 'across', 'action', 'activ', 'ad',
+       'addit', 'address', 'advanc', 'age', 'agre', 'allow', 'also',
+       'alway', 'america', 'american', 'angel', 'announc', 'annual',
+       'app', 'appli', 'applic', 'april', 'around', 'articl', 'assist',
+       'athlet', 'avail', 'award', 'back', 'base', 'basketbal', 'becom',
+       'begin', 'benefit', 'best', 'better', 'bodi', 'book', 'box',
+       'break', 'bring', 'build', 'busi', 'c', 'call', 'camp', 'canada',
+       'care', 'career', 'celebr', 'center', 'central', 'challeng',
+       'champion', 'championship', 'chang', 'check', 'choic', 'choos',
+       'citi', 'class', 'click', 'close', 'club', 'coach', 'code',
+       'collect', 'com', 'combin', 'come', 'committe', 'common', 'commun',
+       'compet', 'competit', 'compil', 'complet', 'comput', 'condit',
+       'connect', 'contact', 'contain', 'content', 'continu', 'contribut',
+       'control', 'cooki', 'copyright', 'countri', 'cours', 'creat',
+       'cup', 'current', 'data', 'date', 'day', 'de', 'design', 'detail',
+       'develop', 'differ', 'director', 'disabl', 'discov', 'document',
+       'donat', 'download', 'e', 'earn', 'easi', 'edit', 'editor', 'educ',
+       'els', 'email', 'en', 'enabl', 'end', 'ensur', 'enter', 'equiti',
+       'error', 'even', 'event', 'everi', 'exampl', 'excel', 'except',
+       'exclus', 'exist', 'experi', 'explor', 'extens', 'facebook',
+       'fame', 'famili', 'faq', 'fast', 'featur', 'feder', 'field',
+       'file', 'final', 'financi', 'find', 'finish', 'first', 'five',
+       'follow', 'form', 'forward', 'found', 'foundat', 'four', 'free',
+       'friend', 'full', 'function', 'futur', 'game', 'gener', 'get',
+       'give', 'global', 'go', 'goal', 'gold', 'govern', 'great', 'group',
+       'grow', 'guid', 'hall', 'happen', 'head', 'health', 'help', 'high',
+       'histor', 'histori', 'home', 'host', 'http', 'impact', 'import',
+       'improv', 'includ', 'inclus', 'individu', 'inform', 'initi',
+       'inspir', 'integr', 'interest', 'intern', 'introduc', 'involv',
+       'issu', 'javascript', 'job', 'join', 'journey', 'jump', 'junior',
+       'know', 'la', 'languag', 'last', 'latest', 'lead', 'leader',
+       'leadership', 'leagu', 'learn', 'legal', 'level', 'librari',
+       'licens', 'life', 'like', 'line', 'link', 'list', 'live', 'lo',
+       'local', 'locat', 'log', 'login', 'long', 'look', 'made', 'mail',
+       'main', 'major', 'make', 'manag', 'mani', 'mar', 'march', 'master',
+       'may', 'mean', 'medal', 'media', 'meet', 'member', 'membership',
+       'memori', 'men', 'menu', 'million', 'mission', 'model', 'month',
+       'much', 'n2', 'n2025', 'n4', 'na', 'nabout', 'nall', 'name',
+       'nathlet', 'nation', 'navig', 'nbecom', 'nbi', 'nc', 'ncareer',
+       'nclose', 'ncode', 'ncontact', 'ncooki', 'ncopyright', 'ndonat',
+       'near', 'network', 'nevent', 'news', 'newslett', 'next',
+       'nfacebook', 'nfaq', 'nfeatur', 'nfind', 'nfollow', 'nfor', 'nget',
+       'nhome', 'nhow', 'ni', 'nif', 'nin', 'ninstagram', 'njoin',
+       'nlatest', 'nlearn', 'nmedia', 'nmore', 'nnation', 'nnew',
+       'noffici', 'non', 'nopen', 'note', 'nour', 'npartner', 'nprivaci',
+       'nprogram', 'nread', 'nreport', 'nresourc', 'nsearch', 'nsee',
+       'nshop', 'nsign', 'nskip', 'nspecial', 'nsport', 'nstart',
+       'nsupport', 'nteam', 'nterm', 'nthe', 'nthi', 'ntwitter', 'nu',
+       'number', 'nusa', 'nvideo', 'nview', 'nwe', 'nwhat', 'nyour',
+       'nyoutub', 'offer', 'offici', 'olymp', 'one', 'onlin', 'open',
+       'oper', 'opportun', 'option', 'org', 'organ', 'p', 'page', 'para',
+       'paralymp', 'part', 'particip', 'partner', 'partnership', 'peopl',
+       'perform', 'person', 'place', 'plan', 'platform', 'play', 'player',
+       'pleas', 'plu', 'point', 'polici', 'possibl', 'potenti', 'power',
+       'practic', 'pre', 'prefer', 'present', 'privaci', 'pro', 'process',
+       'product', 'profession', 'programm', 'project', 'promot',
+       'protect', 'provid', 'public', 'purpos', 'qualifi', 'que',
+       'question', 'rang', 'reach', 'read', 'readi', 'real', 'receiv',
+       'record', 'refer', 'region', 'regist', 'relat', 'releas', 'report',
+       'repres', 'request', 'requir', 'reserv', 'resourc', 'respons',
+       'result', 'return', 'review', 'right', 'road', 'role', 'round',
+       'rule', 'run', 'safeti', 'schedul', 'school', 'scienc', 'score',
+       'search', 'season', 'second', 'secur', 'see', 'select', 'seri',
+       'servic', 'set', 'share', 'shop', 'show', 'sign', 'sinc', 'site',
+       'skate', 'skill', 'skip', 'social', 'softwar', 'sourc', 'special',
+       'speed', 'sponsor', 'sport', 'staff', 'stage', 'standard', 'star',
+       'start', 'state', 'statement', 'step', 'store', 'stori',
+       'structur', 'student', 'style', 'success', 'suggest', 'summer',
+       'support', 'system', 'take', 'team', 'technolog', 'term', 'test',
+       'three', 'time', 'titl', 'today', 'togeth', 'tool', 'top', 'topic',
+       'track', 'train', 'tri', 'two', 'type', 'u', 'unifi', 'unit',
+       'univers', 'updat', 'us', 'user', 'valu', 'version', 'video',
+       'view', 'volunt', 'want', 'watch', 'way', 'web', 'websit', 'week',
+       'weekend', 'welcom', 'well', 'wide', 'win', 'window', 'winter',
+       'within', 'without', 'women', 'work', 'write', 'x', 'year'],
+      dtype=object)
+
+Y por último utilizando el algoritmo de agrupamiento K-Means para analizar datos realizamos las siguientes tareas:
+
+Inicializamos un modelo K-Means con 3 clusters, que luego se ajustará a los datos proporcionados por `tfidf_model`, que contiene las representaciones vectoriales de los textos.
+
+Después de ajustar el modelo, accedemos a las etiquetas asignadas a cada punto que convertimos a un diccionario en un formato estándar con `dict(clusters)`.
+Para cada clúster, se imprime el número de elementos que contiene.
+Asumiendo que `token_dict` contiene las claves asociadas a las páginas web procesadas. Se itera sobre las etiquetas de los clústeres y se imprime la etiqueta junto con el nombre de la página web correspondiente.
+Para cada clúster, se identifican los cuatro tokens más relevantes basándose en los valores de los centros de los clústeres (`km_model.cluster_centers_`). Estos valores representan la importancia de cada token en el clúster. Se seleccionan los índices de los tokens con los valores más altos, se imprimen junto con su importancia
+
+Esto se realiza mediante el siguiente fragmento de código:
+```
+
+km_model = KMeans(n_clusters=3, n_init='auto', verbose=0)
+km_model.fit(tfidf_model)
+
+
+clusters = collections.defaultdict(list)
+for idx, label in enumerate(km_model.labels_):
+    clusters[label].append(idx)
+
+dict(clusters)
+
+
+for key, elements in dict(clusters).items():
+    print(str(key) + ':', len(elements))
+
+
+key = list(token_dict.keys())
+for idx, label in enumerate(km_model.labels_):
+    print(str(label) + ':', key[idx].replace('_','/').replace('.html',''))
+
+
+kmcc = km_model.cluster_centers_.copy()
+for idx, item in enumerate(dict(clusters).items()):
+    print(str(item[0]) + ':')
+    for j in range(4):
+        idxmax = kmcc[idx].argmax()
+        print('  ', feature_names[idxmax], ' - ', kmcc[idx][idxmax])
+        kmcc[idx][idxmax] = 0.0
+    print()
+
+```
+
+Del que se obtienen estos resultados:
+
+
+
+
+
+Que representan los siguiente:
+
+Distribución de elementos por clúster
+2: 30
+0: 69
+1: 12
+
+Esto indica que el clúster 0 contiene 69 elementos, el clúster 1 tiene 12 elementos y el clúster 2 tiene 30 elementos. Esto refleja cómo el algoritmo K-Means ha distribuido las URLs en función de sus características textuales.
+
+Etiquetas de las URLs
+Clúster 2: `https://www.usatriathlon.org/`, `https://www.usaartisticswim.org/`, `http://www.ussoccer.com/`
+Clúster 0: `https://www.mbusa.com/en/home`, `https://cplusplus.com/`, `https://la28.org/`
+Clúster 1: `https://es.wikipedia.org/wiki/C%2B%2B`, `https://computerhoy.20minutos.es/tecnologia/bjarne-stroustrup-aprender-programar-1445288`
+
+Cada URL está asignada a un clúster específico. Por ejemplo, las URLs relacionadas con deportes olímpicos y organizaciones estadounidenses parecen agruparse en el clúster 2, mientras que las relacionadas con programación y tecnología se agrupan en el clúster 0. El clúster 1 parece contener URLs más diversas, posiblemente relacionadas con temas generales o educativos.
+
+Tokens más relevantes por clúster: cada clúster tiene palabras clave que lo caracterizan, basadas en los valores de los centros de los clústeres:
+Clúster 2: este clúster parece estar relacionado con deportes y eventos olímpicos, ya que las palabras clave incluyen "olymp", "game" y "team".
+
+`c`: 0.1391
+`olymp`: 0.1113
+`game`: 0.0663
+`team`: 0.0578
+
+Clúster 0: este clúster parece estar relacionado con estructuras de datos en C++ como 'queue', 'dequeue', etc...
+`de`: 0.6873
+`la`: 0.2861
+`que`: 0.2281 
+Clúster 1: este clúster parece estar relacionado con temas de tecnología o programación, posiblemente con un enfoque en sistemas abiertos o ventanas (como interfaces gráficas).
+`open`: 0.2929
+`window`: 0.0528
+`nation`: 0.0482
+`olymp`: 0.0453
+
+El algoritmo ha agrupado las URLs en función de sus características textuales, y los tokens más relevantes de cada clúster ayudan a identificar los temas principales de cada grupo. Por ejemplo:
+- El clúster 2 está relacionado con deportes y eventos olímpicos.
+- El clúster 0 agrupa funciones de C++.
+- El clúster 1 parece estar relacionado con tecnología y programación.

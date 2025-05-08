@@ -1,0 +1,1239 @@
+En primer lugar he descargado e importado las librerías y funciones necesarias para el desarrollo de la práctica mediante este fragmento de código:
+
+
+```
+
+%pip install numpy
+%pip install matplotlib
+%pip install scikit-learn
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Import from scikit-learn
+from sklearn import datasets
+# from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Perceptron
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import log_loss, accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+
+# Import from datetime
+from datetime import datetime
+
+```
+
+Posteriormente, hemos cargado el fichero optdigits.tra proporcionado, imprimiendo una descripción del contenido, mediante este código:
+```
+
+# Increase de figure size
+plt.rcParams['figure.dpi'] = 150
+
+# Patterns load
+# ------------
+# The digits dataset, train set
+digits = np.loadtxt("dataset/optdigits.tra", dtype=int, delimiter=',')
+
+(n_samples, n_features) = digits.shape
+
+# The digits dataset, test set
+digits_test = datasets.load_digits()
+
+n_samples_test = len(digits_test.images)
+
+print(digits_test.DESCR)
+ 
+```
+ 
+Obteniendo el siguiente resultado:
+.. _digits_dataset:
+
+Optical recognition of handwritten digits dataset
+--------------------------------------------------
+
+**Data Set Characteristics:**
+
+:Number of Instances: 1797
+:Number of Attributes: 64
+:Attribute Information: 8x8 image of integer pixels in the range 0..16.
+:Missing Attribute Values: None
+:Creator: E. Alpaydin (alpaydin '@' boun.edu.tr)
+:Date: July; 1998
+
+This is a copy of the test set of the UCI ML hand-written digits datasets
+https://archive.ics.uci.edu/ml/datasets/Optical+Recognition+of+Handwritten+Digits
+
+The data set contains images of hand-written digits: 10 classes where
+each class refers to a digit.
+
+Preprocessing programs made available by NIST were used to extract
+normalized bitmaps of handwritten digits from a preprinted form. From a
+total of 43 people, 30 contributed to the training set and different 13
+to the test set. 32x32 bitmaps are divided into nonoverlapping blocks of
+4x4 and the number of on pixels are counted in each block. This generates
+an input matrix of 8x8 where each element is an integer in the range
+0..16. This reduces dimensionality and gives invariance to small
+distortions.
+
+For info on NIST preprocessing routines, see M. D. Garris, J. L. Blue, G.
+T. Candela, D. L. Dimmick, J. Geist, P. J. Grother, S. A. Janet, and C.
+L. Wilson, NIST Form-Based Handprint Recognition System, NISTIR 5469,
+1994.
+
+.. dropdown:: References
+
+  - C. Kaynak (1995) Methods of Combining Multiple Classifiers and Their
+    Applications to Handwritten Digit Recognition, MSc Thesis, Institute of
+    Graduate Studies in Science and Engineering, Bogazici University.
+  - E. Alpaydin, C. Kaynak (1998) Cascading Classifiers, Kybernetika.
+  - Ken Tang and Ponnuthurai N. Suganthan and Xi Yao and A. Kai Qin.
+    Linear dimensionalityreduction using relevance weighted LDA. School of
+    Electrical and Electronic Engineering Nanyang Technological University.
+    2005.
+  - Claudio Gentile. A New Approximate Maximal Margin Classification
+    Algorithm. NIPS. 2000.
+
+
+A continuación hemos visualizado las images de testeo que contiene el fichero antes mencionado, haciendo uso del siguiente fragmento de código:
+
+
+```
+
+# Data visualization
+# ------------
+# have a look at the first test images
+n_img_plt = 10
+
+print("Showing first %d digit images" % n_img_plt)
+
+_, axes = plt.subplots(2, n_img_plt//2)
+images_and_labels = list(zip(digits_test.images[:n_img_plt], digits_test.target[:n_img_plt]))
+for ax, (image, label) in zip(np.concatenate(axes), images_and_labels):
+    ax.set_axis_off()
+    ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
+    ax.set_title('real: %i' % label)
+
+plt.show()
+
+```
+
+Obteniendo la siguiente salida:
+image.png
+
+Una vez, hemos visto los datos con los que vamos a tratar, procedamos al preprocesamiento de estos, estableciendo la proporción de entrenamiento-testeo, haciendo uso del siguiente fragmento de código:
+
+
+```
+
+# Data preprocessing
+# ------------
+train_size = 0.75
+test_size = 1 - train_size
+
+print("Preprocessing data, %d%% for training and %d%% for validation" % (train_size * 100, test_size * 100))
+
+# scale inputs and flatten images
+patterns_input = digits[:, :n_features-1] / 16.
+input_test = digits_test.images.reshape((n_samples_test, -1)) / 16.
+
+# targets
+patterns_target = digits[:, -1]
+target_test = digits_test.target
+
+# Split and shuffle patterns
+input_train, input_valid, target_train, target_valid = train_test_split(
+patterns_input, patterns_target, train_size=train_size, test_size=test_size,
+random_state=0, shuffle=True)
+
+# Print data sets cardinality
+print("Number of patterns in train set: %d" % len(target_train))
+print("Number of patterns in valid set: %d" % len(target_valid))
+print("Number of patterns in test set: %d" % len(target_test))
+```
+
+Obteniendo la siguiente salida:
+Preprocessing data, 75% for training and 25% for validation
+Number of patterns in train set: 2867
+Number of patterns in valid set: 956
+Number of patterns in test set: 1797
+
+Ahora vamos a modelar el perceptrón con un número máximo de iteraciones, en nuestro caso 30, con el siguiente fragmento de código:
+
+
+```
+
+# Modeling Perceptron
+# ------------
+max_iter = 30
+
+print("Learning a Perceptron with %d maximum number of iterations and ..." % max_iter)
+
+per = Perceptron(max_iter=max_iter, shuffle=False, verbose=True)
+per.fit(input_train, target_train)
+
+```
+
+Obteniendo los siguientes resultados:
+Learning a Perceptron with 30 maximum number of iterations and ...
+-- Epoch 1
+Norm: 21.39, NNZs: 53, Bias: -5.000000, T: 2867, Avg. loss: 0.056825
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 26.22, NNZs: 55, Bias: -6.000000, T: 5734, Avg. loss: 0.024072
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 30.38, NNZs: 56, Bias: -7.000000, T: 8601, Avg. loss: 0.011430
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 32.33, NNZs: 57, Bias: -8.000000, T: 11468, Avg. loss: 0.013570
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 33.06, NNZs: 55, Bias: -9.000000, T: 14335, Avg. loss: 0.019978
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 33.58, NNZs: 57, Bias: -9.000000, T: 17202, Avg. loss: 0.010176
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 35.11, NNZs: 57, Bias: -9.000000, T: 20069, Avg. loss: 0.006111
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 36.07, NNZs: 57, Bias: -10.000000, T: 22936, Avg. loss: 0.011017
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 25803, Avg. loss: 0.005415
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 28670, Avg. loss: 0.000000
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 31537, Avg. loss: 0.000000
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 34404, Avg. loss: 0.000000
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 37271, Avg. loss: 0.000000
+Total training time: 0.00 seconds.
+-- Epoch 14
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 40138, Avg. loss: 0.000000
+Total training time: 0.00 seconds.
+-- Epoch 15
+Norm: 36.44, NNZs: 57, Bias: -10.000000, T: 43005, Avg. loss: 0.000000
+Total training time: 0.01 seconds.
+Convergence after 15 epochs took 0.01 seconds
+-- Epoch 1
+Norm: 34.08, NNZs: 58, Bias: -10.000000, T: 2867, Avg. loss: 0.271330
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 38.12, NNZs: 59, Bias: -15.000000, T: 5734, Avg. loss: 0.205020
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 43.14, NNZs: 59, Bias: -18.000000, T: 8601, Avg. loss: 0.210499
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 46.07, NNZs: 58, Bias: -21.000000, T: 11468, Avg. loss: 0.196122
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 47.52, NNZs: 57, Bias: -24.000000, T: 14335, Avg. loss: 0.194041
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 50.64, NNZs: 59, Bias: -27.000000, T: 17202, Avg. loss: 0.175875
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 52.33, NNZs: 59, Bias: -29.000000, T: 20069, Avg. loss: 0.174716
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 54.23, NNZs: 59, Bias: -31.000000, T: 22936, Avg. loss: 0.193078
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 56.87, NNZs: 59, Bias: -32.000000, T: 25803, Avg. loss: 0.176875
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 57.83, NNZs: 58, Bias: -33.000000, T: 28670, Avg. loss: 0.166360
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 58.86, NNZs: 59, Bias: -35.000000, T: 31537, Avg. loss: 0.185347
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 59.77, NNZs: 59, Bias: -36.000000, T: 34404, Avg. loss: 0.192122
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 60.88, NNZs: 58, Bias: -37.000000, T: 37271, Avg. loss: 0.179663
+Total training time: 0.00 seconds.
+-- Epoch 14
+Norm: 61.61, NNZs: 59, Bias: -38.000000, T: 40138, Avg. loss: 0.182835
+Total training time: 0.00 seconds.
+-- Epoch 15
+Norm: 62.11, NNZs: 59, Bias: -40.000000, T: 43005, Avg. loss: 0.174804
+Total training time: 0.00 seconds.
+Convergence after 15 epochs took 0.00 seconds
+-- Epoch 1
+Norm: 24.08, NNZs: 50, Bias: -3.000000, T: 2867, Avg. loss: 0.124568
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 30.77, NNZs: 51, Bias: -4.000000, T: 5734, Avg. loss: 0.067346
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 34.01, NNZs: 53, Bias: -5.000000, T: 8601, Avg. loss: 0.047156
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 36.77, NNZs: 54, Bias: -5.000000, T: 11468, Avg. loss: 0.038414
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 38.68, NNZs: 57, Bias: -6.000000, T: 14335, Avg. loss: 0.056403
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 41.08, NNZs: 57, Bias: -7.000000, T: 17202, Avg. loss: 0.040271
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 43.47, NNZs: 57, Bias: -7.000000, T: 20069, Avg. loss: 0.055757
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 45.48, NNZs: 56, Bias: -8.000000, T: 22936, Avg. loss: 0.044002
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 47.24, NNZs: 57, Bias: -8.000000, T: 25803, Avg. loss: 0.044365
+Total training time: 0.00 seconds.
+Convergence after 9 epochs took 0.00 seconds
+-- Epoch 1
+Norm: 27.76, NNZs: 52, Bias: -3.000000, T: 2867, Avg. loss: 0.152030
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 34.63, NNZs: 52, Bias: -3.000000, T: 5734, Avg. loss: 0.123613
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 37.84, NNZs: 53, Bias: -4.000000, T: 8601, Avg. loss: 0.114198
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 41.11, NNZs: 52, Bias: -4.000000, T: 11468, Avg. loss: 0.096990
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 44.07, NNZs: 53, Bias: -6.000000, T: 14335, Avg. loss: 0.109936
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 46.66, NNZs: 53, Bias: -6.000000, T: 17202, Avg. loss: 0.107354
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 48.08, NNZs: 53, Bias: -6.000000, T: 20069, Avg. loss: 0.094243
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 50.35, NNZs: 53, Bias: -7.000000, T: 22936, Avg. loss: 0.102877
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 52.18, NNZs: 52, Bias: -8.000000, T: 25803, Avg. loss: 0.090582
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 53.78, NNZs: 53, Bias: -8.000000, T: 28670, Avg. loss: 0.080577
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 55.23, NNZs: 53, Bias: -8.000000, T: 31537, Avg. loss: 0.073676
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 56.34, NNZs: 53, Bias: -8.000000, T: 34404, Avg. loss: 0.080170
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 57.46, NNZs: 53, Bias: -9.000000, T: 37271, Avg. loss: 0.102287
+Total training time: 0.01 seconds.
+-- Epoch 14
+Norm: 58.86, NNZs: 53, Bias: -10.000000, T: 40138, Avg. loss: 0.082452
+Total training time: 0.01 seconds.
+-- Epoch 15
+Norm: 60.65, NNZs: 53, Bias: -10.000000, T: 43005, Avg. loss: 0.086534
+Total training time: 0.01 seconds.
+-- Epoch 16
+Norm: 62.04, NNZs: 53, Bias: -10.000000, T: 45872, Avg. loss: 0.086574
+Total training time: 0.01 seconds.
+Convergence after 16 epochs took 0.01 seconds
+-- Epoch 1
+Norm: 27.64, NNZs: 56, Bias: -1.000000, T: 2867, Avg. loss: 0.128499
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 33.80, NNZs: 58, Bias: 0.000000, T: 5734, Avg. loss: 0.073892
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 38.64, NNZs: 57, Bias: 1.000000, T: 8601, Avg. loss: 0.070973
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 42.43, NNZs: 58, Bias: 1.000000, T: 11468, Avg. loss: 0.050073
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 46.28, NNZs: 57, Bias: 1.000000, T: 14335, Avg. loss: 0.042352
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 47.81, NNZs: 58, Bias: 1.000000, T: 17202, Avg. loss: 0.041826
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 49.74, NNZs: 58, Bias: 1.000000, T: 20069, Avg. loss: 0.028385
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 52.08, NNZs: 58, Bias: 1.000000, T: 22936, Avg. loss: 0.037406
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 53.33, NNZs: 58, Bias: 1.000000, T: 25803, Avg. loss: 0.023725
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 54.52, NNZs: 58, Bias: 1.000000, T: 28670, Avg. loss: 0.022181
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 55.14, NNZs: 58, Bias: 1.000000, T: 31537, Avg. loss: 0.016562
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 56.73, NNZs: 58, Bias: 0.000000, T: 34404, Avg. loss: 0.016392
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 58.48, NNZs: 58, Bias: 1.000000, T: 37271, Avg. loss: 0.021443
+Total training time: 0.01 seconds.
+-- Epoch 14
+Norm: 59.84, NNZs: 58, Bias: 1.000000, T: 40138, Avg. loss: 0.022349
+Total training time: 0.01 seconds.
+-- Epoch 15
+Norm: 61.11, NNZs: 58, Bias: 1.000000, T: 43005, Avg. loss: 0.023312
+Total training time: 0.01 seconds.
+-- Epoch 16
+Norm: 63.07, NNZs: 58, Bias: 1.000000, T: 45872, Avg. loss: 0.027540
+Total training time: 0.01 seconds.
+Convergence after 16 epochs took 0.01 seconds
+-- Epoch 1
+Norm: 29.98, NNZs: 55, Bias: -3.000000, T: 2867, Avg. loss: 0.155247
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 34.95, NNZs: 56, Bias: -5.000000, T: 5734, Avg. loss: 0.077008
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 40.23, NNZs: 56, Bias: -5.000000, T: 8601, Avg. loss: 0.049524
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 42.32, NNZs: 55, Bias: -5.000000, T: 11468, Avg. loss: 0.058297
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 45.06, NNZs: 55, Bias: -5.000000, T: 14335, Avg. loss: 0.060073
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 47.14, NNZs: 54, Bias: -5.000000, T: 17202, Avg. loss: 0.045920
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 48.83, NNZs: 56, Bias: -5.000000, T: 20069, Avg. loss: 0.037628
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 52.05, NNZs: 56, Bias: -6.000000, T: 22936, Avg. loss: 0.045077
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 53.40, NNZs: 56, Bias: -6.000000, T: 25803, Avg. loss: 0.046563
+Total training time: 0.01 seconds.
+-- Epoch 10
+Norm: 55.16, NNZs: 55, Bias: -6.000000, T: 28670, Avg. loss: 0.037001
+Total training time: 0.01 seconds.
+-- Epoch 11
+Norm: 56.20, NNZs: 56, Bias: -6.000000, T: 31537, Avg. loss: 0.043388
+Total training time: 0.01 seconds.
+-- Epoch 12
+Norm: 57.27, NNZs: 56, Bias: -6.000000, T: 34404, Avg. loss: 0.042079
+Total training time: 0.01 seconds.
+Convergence after 12 epochs took 0.01 seconds
+-- Epoch 1
+Norm: 23.16, NNZs: 54, Bias: -2.000000, T: 2867, Avg. loss: 0.062662
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 26.18, NNZs: 53, Bias: -3.000000, T: 5734, Avg. loss: 0.036354
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 29.03, NNZs: 54, Bias: -4.000000, T: 8601, Avg. loss: 0.023383
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 30.42, NNZs: 55, Bias: -5.000000, T: 11468, Avg. loss: 0.026432
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 32.74, NNZs: 55, Bias: -6.000000, T: 14335, Avg. loss: 0.018538
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 34.32, NNZs: 55, Bias: -6.000000, T: 17202, Avg. loss: 0.009503
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 35.88, NNZs: 55, Bias: -7.000000, T: 20069, Avg. loss: 0.020297
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 36.39, NNZs: 55, Bias: -7.000000, T: 22936, Avg. loss: 0.010217
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 37.25, NNZs: 54, Bias: -8.000000, T: 25803, Avg. loss: 0.016249
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 39.35, NNZs: 55, Bias: -8.000000, T: 28670, Avg. loss: 0.021087
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 41.48, NNZs: 55, Bias: -9.000000, T: 31537, Avg. loss: 0.013942
+Total training time: 0.00 seconds.
+Convergence after 11 epochs took 0.00 seconds
+-- Epoch 1
+Norm: 27.56, NNZs: 52, Bias: -1.000000, T: 2867, Avg. loss: 0.071069
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 31.37, NNZs: 53, Bias: -2.000000, T: 5734, Avg. loss: 0.027679
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 34.11, NNZs: 53, Bias: -3.000000, T: 8601, Avg. loss: 0.022119
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 36.01, NNZs: 53, Bias: -3.000000, T: 11468, Avg. loss: 0.023463
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 38.40, NNZs: 52, Bias: -3.000000, T: 14335, Avg. loss: 0.024805
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 40.16, NNZs: 53, Bias: -4.000000, T: 17202, Avg. loss: 0.012123
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 40.96, NNZs: 53, Bias: -5.000000, T: 20069, Avg. loss: 0.011681
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 42.31, NNZs: 53, Bias: -5.000000, T: 22936, Avg. loss: 0.014534
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 43.36, NNZs: 53, Bias: -5.000000, T: 25803, Avg. loss: 0.013461
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 44.21, NNZs: 53, Bias: -6.000000, T: 28670, Avg. loss: 0.010112
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 45.16, NNZs: 53, Bias: -6.000000, T: 31537, Avg. loss: 0.007453
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 46.70, NNZs: 52, Bias: -6.000000, T: 34404, Avg. loss: 0.004889
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 47.78, NNZs: 53, Bias: -7.000000, T: 37271, Avg. loss: 0.011957
+Total training time: 0.00 seconds.
+-- Epoch 14
+Norm: 48.75, NNZs: 53, Bias: -7.000000, T: 40138, Avg. loss: 0.010854
+Total training time: 0.00 seconds.
+-- Epoch 15
+Norm: 49.48, NNZs: 53, Bias: -7.000000, T: 43005, Avg. loss: 0.011020
+Total training time: 0.00 seconds.
+-- Epoch 16
+Norm: 50.13, NNZs: 53, Bias: -7.000000, T: 45872, Avg. loss: 0.011446
+Total training time: 0.01 seconds.
+-- Epoch 17
+Norm: 51.22, NNZs: 53, Bias: -7.000000, T: 48739, Avg. loss: 0.015043
+Total training time: 0.01 seconds.
+Convergence after 17 epochs took 0.01 seconds
+-- Epoch 1
+Norm: 33.04, NNZs: 55, Bias: -10.000000, T: 2867, Avg. loss: 0.430663
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 41.41, NNZs: 57, Bias: -16.000000, T: 5734, Avg. loss: 0.330952
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 47.48, NNZs: 57, Bias: -19.000000, T: 8601, Avg. loss: 0.304882
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 51.28, NNZs: 58, Bias: -21.000000, T: 11468, Avg. loss: 0.294557
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 54.84, NNZs: 58, Bias: -23.000000, T: 14335, Avg. loss: 0.290910
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 56.52, NNZs: 58, Bias: -25.000000, T: 17202, Avg. loss: 0.302661
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 58.06, NNZs: 58, Bias: -28.000000, T: 20069, Avg. loss: 0.276167
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 60.73, NNZs: 58, Bias: -29.000000, T: 22936, Avg. loss: 0.257852
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 63.11, NNZs: 57, Bias: -29.000000, T: 25803, Avg. loss: 0.246877
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 64.91, NNZs: 58, Bias: -30.000000, T: 28670, Avg. loss: 0.292738
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 65.50, NNZs: 58, Bias: -32.000000, T: 31537, Avg. loss: 0.284698
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 65.77, NNZs: 59, Bias: -34.000000, T: 34404, Avg. loss: 0.264023
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 66.99, NNZs: 59, Bias: -34.000000, T: 37271, Avg. loss: 0.260031
+Total training time: 0.00 seconds.
+-- Epoch 14
+Norm: 68.12, NNZs: 59, Bias: -36.000000, T: 40138, Avg. loss: 0.276534
+Total training time: 0.00 seconds.
+Convergence after 14 epochs took 0.00 seconds
+-- Epoch 1
+Norm: 31.29, NNZs: 52, Bias: -6.000000, T: 2867, Avg. loss: 0.389519
+Total training time: 0.00 seconds.
+-- Epoch 2
+Norm: 37.54, NNZs: 53, Bias: -9.000000, T: 5734, Avg. loss: 0.303291
+Total training time: 0.00 seconds.
+-- Epoch 3
+Norm: 41.54, NNZs: 53, Bias: -12.000000, T: 8601, Avg. loss: 0.284425
+Total training time: 0.00 seconds.
+-- Epoch 4
+Norm: 45.17, NNZs: 53, Bias: -15.000000, T: 11468, Avg. loss: 0.257840
+Total training time: 0.00 seconds.
+-- Epoch 5
+Norm: 48.35, NNZs: 53, Bias: -18.000000, T: 14335, Avg. loss: 0.248787
+Total training time: 0.00 seconds.
+-- Epoch 6
+Norm: 51.92, NNZs: 53, Bias: -19.000000, T: 17202, Avg. loss: 0.263852
+Total training time: 0.00 seconds.
+-- Epoch 7
+Norm: 55.28, NNZs: 54, Bias: -20.000000, T: 20069, Avg. loss: 0.258768
+Total training time: 0.00 seconds.
+-- Epoch 8
+Norm: 57.24, NNZs: 53, Bias: -23.000000, T: 22936, Avg. loss: 0.245017
+Total training time: 0.00 seconds.
+-- Epoch 9
+Norm: 59.88, NNZs: 54, Bias: -25.000000, T: 25803, Avg. loss: 0.234566
+Total training time: 0.00 seconds.
+-- Epoch 10
+Norm: 61.97, NNZs: 54, Bias: -27.000000, T: 28670, Avg. loss: 0.233374
+Total training time: 0.00 seconds.
+-- Epoch 11
+Norm: 63.74, NNZs: 54, Bias: -28.000000, T: 31537, Avg. loss: 0.221325
+Total training time: 0.00 seconds.
+-- Epoch 12
+Norm: 66.09, NNZs: 54, Bias: -29.000000, T: 34404, Avg. loss: 0.233908
+Total training time: 0.00 seconds.
+-- Epoch 13
+Norm: 67.35, NNZs: 54, Bias: -31.000000, T: 37271, Avg. loss: 0.241859
+Total training time: 0.00 seconds.
+-- Epoch 14
+Norm: 69.69, NNZs: 53, Bias: -30.000000, T: 40138, Avg. loss: 0.224616
+Total training time: 0.00 seconds.
+-- Epoch 15
+Norm: 71.45, NNZs: 54, Bias: -30.000000, T: 43005, Avg. loss: 0.238037
+Total training time: 0.00 seconds.
+-- Epoch 16
+Norm: 72.26, NNZs: 54, Bias: -31.000000, T: 45872, Avg. loss: 0.235620
+Total training time: 0.00 seconds.
+Convergence after 16 epochs took 0.00 seconds
+
+Comprobemos los resultados ahora con el siguiente fragmento de código:
+
+```
+# Results
+print("Printing Perceptron results")
+
+predict_train = per.predict(input_train)
+predict_valid = per.predict(input_valid)
+
+print("Train accuracy: %.3f%%" % (accuracy_score(target_train, predict_train) * 100))
+print("Valid accuracy: %.3f%%" % (accuracy_score(target_valid, predict_valid) * 100))
+```
+ 
+Obteniendo estos resultados, los cuales indican una muy buena precisión del modelo:
+Printing Perceptron results
+Train accuracy: 96.512%
+Valid accuracy: 95.293%
+
+Procedemos a modelar el MLP a mayor escala, y validarlo con el conjunto de entrenamiento, con el siguiente código:
+
+```
+# Modeling MLP
+# ------------
+# Function to training and validate MLP
+def MLP_train_valid(mlp, input_train, target_train, input_valid, target_valid, max_iter, valid_cycles, verbose):
+"""
+Train and valid MLP every valid_cycles iterations
+"""
+classes = np.unique(target_train)
+loss_valid = []
+for i in range(max_iter//valid_cycles):
+for j in range(valid_cycles):
+out = mlp.partial_fit(input_train, target_train, classes)
+# Calculate loss function of valid set
+last_lost_valid = log_loss(target_valid, mlp.predict_proba(input_valid))
+loss_valid.append(last_lost_valid)
+if verbose:
+print("Iteration %d, train loss = %.8f, valid loss = %.8f" %
+(mlp.n_iter_, mlp.loss_, last_lost_valid))
+if early_stopping and (i > 0) and (last_lost_valid > loss_valid[-2]): # Early stopping
+if verbose:
+print("Early stopping: Validation score did not improve")
+break
+if verbose: print(out)
+if verbose:
+# Visualizing the Cost Function Trajectory
+# (https://sdsawtelle.github.io/blog/output/week4-andrew-ng-machine-learning-with-python.html#Visualizing-the-Cost-Function-Trajectory)
+print("Visualizing the Cost Function Trajectory")
+plt.plot(range(1, len(mlp.loss_curve_)+1), mlp.loss_curve_, label='Train loss')
+plt.plot(range(valid_cycles,len(loss_valid)*valid_cycles+valid_cycles,valid_cycles), loss_valid, '-o', label='Valid loss')
+plt.xlabel('number of iterations')
+plt.ylabel('loss function')
+plt.legend(loc='upper right')
+plt.show()
+
+# Multilayer Percetron wiht n_hidden hidden neurons
+n_hidden = 60
+max_iter = 300
+learning_rate_init = 0.001
+valid_cycles = 5
+early_stopping = True
+
+print("Learning a MLP with %d hidden neurons, %d maximum number of iterations and %.8f learning rate ..." % (n_hidden, max_iter, learning_rate_init))
+
+mlp = MLPClassifier(hidden_layer_sizes=(n_hidden,), learning_rate_init=learning_rate_init, shuffle=False, random_state=0, verbose=False)
+
+MLP_train_valid(mlp, input_train, target_train, input_valid, target_valid, max_iter, valid_cycles, True)
+```
+Obteniendo la siguiente salida:
+Learning a MLP with 60 hidden neurons, 300 maximum number of iterations and 0.00100000 learning rate ...
+Iteration 1, train loss = 1.45721410, valid loss = 1.34168537
+Iteration 1, train loss = 0.68608528, valid loss = 0.64179998
+Iteration 1, train loss = 0.37861924, valid loss = 0.37121381
+Iteration 1, train loss = 0.26170688, valid loss = 0.26460368
+Iteration 1, train loss = 0.20134851, valid loss = 0.20812804
+Iteration 1, train loss = 0.16532717, valid loss = 0.17446236
+Iteration 1, train loss = 0.14047095, valid loss = 0.15175895
+Iteration 1, train loss = 0.12216185, valid loss = 0.13546013
+Iteration 1, train loss = 0.10821937, valid loss = 0.12397071
+Iteration 1, train loss = 0.09715307, valid loss = 0.11520259
+Iteration 1, train loss = 0.08811606, valid loss = 0.10842173
+Iteration 1, train loss = 0.08048975, valid loss = 0.10295672
+Iteration 1, train loss = 0.07400960, valid loss = 0.09866531
+Iteration 1, train loss = 0.06837748, valid loss = 0.09521559
+Iteration 1, train loss = 0.06343167, valid loss = 0.09229984
+Iteration 1, train loss = 0.05901775, valid loss = 0.08987552
+Iteration 1, train loss = 0.05506407, valid loss = 0.08769960
+Iteration 1, train loss = 0.05144685, valid loss = 0.08588696
+Iteration 1, train loss = 0.04813044, valid loss = 0.08429976
+Iteration 1, train loss = 0.04507154, valid loss = 0.08294131
+Iteration 1, train loss = 0.04230578, valid loss = 0.08179305
+Iteration 1, train loss = 0.03974013, valid loss = 0.08078688
+Iteration 1, train loss = 0.03739050, valid loss = 0.07989628
+Iteration 1, train loss = 0.03518992, valid loss = 0.07907544
+Iteration 1, train loss = 0.03317787, valid loss = 0.07835366
+Iteration 1, train loss = 0.03131020, valid loss = 0.07783089
+Iteration 1, train loss = 0.02956370, valid loss = 0.07729691
+Iteration 1, train loss = 0.02792969, valid loss = 0.07685703
+Iteration 1, train loss = 0.02638623, valid loss = 0.07655262
+Iteration 1, train loss = 0.02494330, valid loss = 0.07608464
+Iteration 1, train loss = 0.02360342, valid loss = 0.07583464
+Iteration 1, train loss = 0.02232061, valid loss = 0.07554311
+Iteration 1, train loss = 0.02113649, valid loss = 0.07521724
+Iteration 1, train loss = 0.02003384, valid loss = 0.07495752
+Iteration 1, train loss = 0.01896582, valid loss = 0.07465360
+Iteration 1, train loss = 0.01794910, valid loss = 0.07455453
+Iteration 1, train loss = 0.01702702, valid loss = 0.07440154
+Iteration 1, train loss = 0.01614250, valid loss = 0.07423514
+Iteration 1, train loss = 0.01530282, valid loss = 0.07414113
+Iteration 1, train loss = 0.01451940, valid loss = 0.07406702
+Iteration 1, train loss = 0.01377877, valid loss = 0.07401471
+Iteration 1, train loss = 0.01307868, valid loss = 0.07396372
+Iteration 1, train loss = 0.01241741, valid loss = 0.07392967
+Iteration 1, train loss = 0.01179220, valid loss = 0.07393232
+Early stopping: Validation score did not improve
+MLPClassifier(hidden_layer_sizes=(60,), random_state=0, shuffle=False)
+Visualizing the Cost Function Trajectory
+
+image%20%281%29.png
+ 
+Comparemos ahora estos resultados iniciales, mediante este fragmento de código:
+
+```
+# Intitial results
+# ------------
+print("Printing initial results")
+
+predict_train = mlp.predict(input_train)
+predict_valid = mlp.predict(input_valid)
+
+print("Train accuracy: %.3f%%" % (accuracy_score(target_train, predict_train) * 100))
+print("Valid accuracy: %.3f%%" % (accuracy_score(target_valid, predict_valid) * 100))
+
+print("Train confusion matrix:")
+print(confusion_matrix(target_train, predict_train))
+print("Valid confusion matrix:")
+print(confusion_matrix(target_valid, predict_valid))
+
+print("Train classification report:")
+print(classification_report(target_train, predict_train))
+print("Valid classification report:")
+print(classification_report(target_valid, predict_valid))
+
+```
+
+Obteniendo los siguientes resultados:
+Printing initial results
+Train accuracy: 99.965%
+Valid accuracy: 97.699%
+Train confusion matrix:
+[[275   0   0   0   0   0   0   0   0   0]
+ [  0 289   0   0   0   0   0   0   0   0]
+ [  0   0 284   0   0   0   0   0   0   0]
+ [  0   0   0 294   0   1   0   0   0   0]
+ [  0   0   0   0 299   0   0   0   0   0]
+ [  0   0   0   0   0 290   0   0   0   0]
+ [  0   0   0   0   0   0 281   0   0   0]
+ [  0   0   0   0   0   0   0 292   0   0]
+ [  0   0   0   0   0   0   0   0 281   0]
+ [  0   0   0   0   0   0   0   0   0 281]]
+Valid confusion matrix:
+[[98  0  1  0  0  0  1  0  1  0]
+ [ 0 97  0  0  0  0  0  2  1  0]
+ [ 0  0 95  0  0  0  1  0  0  0]
+ [ 0  0  0 94  0  0  0  0  0  0]
+ [ 0  0  0  0 85  0  1  0  0  2]
+ [ 0  0  0  1  0 82  0  0  0  3]
+ [ 0  1  0  0  0  0 95  0  0  0]
+ [ 0  0  0  0  0  0  0 95  0  0]
+ [ 0  1  0  1  0  0  2  0 95  0]
+ [ 0  0  0  1  1  0  0  0  1 98]]
+Train classification report:
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00       275
+           1       1.00      1.00      1.00       289
+           2       1.00      1.00      1.00       284
+           3       1.00      1.00      1.00       295
+           4       1.00      1.00      1.00       299
+           5       1.00      1.00      1.00       290
+           6       1.00      1.00      1.00       281
+           7       1.00      1.00      1.00       292
+           8       1.00      1.00      1.00       281
+           9       1.00      1.00      1.00       281
+
+    accuracy                           1.00      2867
+   macro avg       1.00      1.00      1.00      2867
+weighted avg       1.00      1.00      1.00      2867
+
+Valid classification report:
+              precision    recall  f1-score   support
+
+           0       1.00      0.97      0.98       101
+           1       0.98      0.97      0.97       100
+           2       0.99      0.99      0.99        96
+           3       0.97      1.00      0.98        94
+           4       0.99      0.97      0.98        88
+           5       1.00      0.95      0.98        86
+           6       0.95      0.99      0.97        96
+           7       0.98      1.00      0.99        95
+           8       0.97      0.96      0.96        99
+           9       0.95      0.97      0.96       101
+
+    accuracy                           0.98       956
+   macro avg       0.98      0.98      0.98       956
+weighted avg       0.98      0.98      0.98       956
+
+ 
+
+Optimicemos ahora el ratio de aprendizaje, y visualizamos la función con diferentes ratios, usando este fragmento de código:
+
+
+```
+
+# Learning rate optimization
+# ------------
+# Test with different learning_rate_init
+print("Learning rate optimization")
+
+tests_learning_rate_init = [0.001, 0.005, 0.01, 0.05, 0.1]
+activation = 'relu'
+random_state = 0
+
+now = datetime.now()
+loss_curves = []
+for lr in tests_learning_rate_init:
+mlp = MLPClassifier(hidden_layer_sizes=(n_hidden,), learning_rate_init=lr, shuffle=False, random_state=random_state, verbose=False, activation=activation)
+MLP_train_valid(mlp, input_train, target_train, input_valid, target_valid, max_iter, valid_cycles, False)
+ 
+loss_curves.append(mlp.loss_curve_)
+
+print("Number of seconds for training: %d" % (datetime.now() - now).total_seconds())
+ 
+# Show results
+print("Visualizing the Cost Function Trajectory with different learning rates")
+for (lr, loss_curve) in zip(tests_learning_rate_init, loss_curves):
+plt.plot(range(1, len(loss_curve)+1), loss_curve, label='larning rate = ' + str(lr))
+
+plt.xlabel('number of iterations')
+plt.ylabel('loss function')
+plt.legend(loc='upper right')
+plt.show()
+```
+
+Obteniendo la siguiente gráfica como resultado:
+
+image%20%282%29.png
+
+ 
+
+Optimicemos por tanto la arquitectura a las iteraciones óptimas, haciendo uso de este fragmento de código:
+
+
+```
+
+# Architecture optimization
+# ------------
+print("Architecture optimization")
+
+# Test MLP with differents number of hidden units and several repetitions
+tests_n_hidden = [10, 30, 50, 70, 90, 110, 130, 150, 170, 190]
+n_reps = 10
+# n_reps = 20
+activation = 'relu'
+# activation = 'logistic'
+# learning_rate_init = 0.001
+# learning_rate_init = 0.01
+learning_rate_init = 0.005
+
+now = datetime.now()
+best_mlp = []
+best_acc = 0.0
+accs_train = []
+accs_valid = []
+for n_hidden in tests_n_hidden:
+    max_acc_train = max_acc_valid = 0.0
+    for random_state in range(n_reps):
+        mlp = MLPClassifier(hidden_layer_sizes=(n_hidden,), learning_rate_init=learning_rate_init, shuffle=False, random_state=random_state, verbose=False, activation=activation)
+        MLP_train_valid(mlp, input_train, target_train, input_valid, target_valid, max_iter, valid_cycles, False)
+        
+        acc_train = accuracy_score(target_train, mlp.predict(input_train))
+        acc_valid = accuracy_score(target_valid,mlp.predict(input_valid))
+        print("Seed = %d, train acc = %.8f, valid acc = %.8f, iterations = %d" % (random_state, acc_train, acc_valid, len(mlp.loss_curve_)))
+        if (max_acc_valid < acc_valid):
+            max_acc_valid = acc_valid
+            max_acc_train = acc_train
+            if (acc_valid > best_acc):
+                best_acc = acc_valid
+                best_mlp = mlp
+    accs_train.append(max_acc_train)
+    accs_valid.append(max_acc_valid)
+    print("Number hidden units = %i, train acc = %.8f, max valid acc = %.8f" % (n_hidden, max_acc_train, max_acc_valid))
+
+print("Number of seconds for training: %d" % (datetime.now() - now).total_seconds())
+print("Best MLP valid accuracy: %.8f%%" % (best_acc * 100))
+print("Best MLP: ", best_mlp)
+
+```
+
+Obteniendo la siguiente salida:
+Architecture optimization
+Seed = 0, train acc = 0.98709452, valid acc = 0.96652720, iterations = 105
+Seed = 1, train acc = 0.98116498, valid acc = 0.96129707, iterations = 85
+Seed = 2, train acc = 0.98848971, valid acc = 0.97907950, iterations = 85
+Seed = 3, train acc = 0.98988490, valid acc = 0.97175732, iterations = 90
+Seed = 4, train acc = 0.99093129, valid acc = 0.96966527, iterations = 90
+Seed = 5, train acc = 0.98430415, valid acc = 0.96234310, iterations = 90
+Seed = 6, train acc = 0.99302407, valid acc = 0.97071130, iterations = 105
+Seed = 7, train acc = 0.99162888, valid acc = 0.97280335, iterations = 95
+Seed = 8, train acc = 0.98116498, valid acc = 0.96443515, iterations = 80
+Seed = 9, train acc = 0.98500174, valid acc = 0.96757322, iterations = 90
+Number hidden units = 10, train acc = 0.98848971, max valid acc = 0.97907950
+Seed = 0, train acc = 0.99441925, valid acc = 0.98012552, iterations = 60
+Seed = 1, train acc = 0.99720963, valid acc = 0.97803347, iterations = 70
+Seed = 2, train acc = 0.99511685, valid acc = 0.97175732, iterations = 50
+Seed = 3, train acc = 0.99860481, valid acc = 0.97594142, iterations = 85
+Seed = 4, train acc = 0.99686083, valid acc = 0.97803347, iterations = 60
+Seed = 5, train acc = 0.99755842, valid acc = 0.97803347, iterations = 70
+Seed = 6, train acc = 0.99616324, valid acc = 0.97698745, iterations = 55
+Seed = 7, train acc = 0.99616324, valid acc = 0.97907950, iterations = 60
+Seed = 8, train acc = 0.99720963, valid acc = 0.97698745, iterations = 60
+Seed = 9, train acc = 0.99651203, valid acc = 0.97907950, iterations = 65
+Number hidden units = 30, train acc = 0.99441925, max valid acc = 0.98012552
+Seed = 0, train acc = 0.99720963, valid acc = 0.97594142, iterations = 50
+Seed = 1, train acc = 0.99790722, valid acc = 0.97594142, iterations = 55
+Seed = 2, train acc = 0.99755842, valid acc = 0.97594142, iterations = 55
+Seed = 3, train acc = 0.99790722, valid acc = 0.98012552, iterations = 50
+Seed = 4, train acc = 0.99895361, valid acc = 0.97594142, iterations = 55
+Seed = 5, train acc = 0.99686083, valid acc = 0.97698745, iterations = 45
+Seed = 6, train acc = 0.99965120, valid acc = 0.98326360, iterations = 65
+Seed = 7, train acc = 0.99686083, valid acc = 0.97594142, iterations = 45
+Seed = 8, train acc = 0.99790722, valid acc = 0.97803347, iterations = 50
+Seed = 9, train acc = 0.99755842, valid acc = 0.97698745, iterations = 60
+Number hidden units = 50, train acc = 0.99965120, max valid acc = 0.98326360
+Seed = 0, train acc = 1.00000000, valid acc = 0.98221757, iterations = 70
+Seed = 1, train acc = 0.99860481, valid acc = 0.97907950, iterations = 50
+Seed = 2, train acc = 0.99686083, valid acc = 0.97594142, iterations = 45
+Seed = 3, train acc = 0.99895361, valid acc = 0.98012552, iterations = 60
+Seed = 4, train acc = 0.99965120, valid acc = 0.97907950, iterations = 55
+Seed = 5, train acc = 0.99720963, valid acc = 0.98012552, iterations = 45
+Seed = 6, train acc = 0.99965120, valid acc = 0.98326360, iterations = 60
+Seed = 7, train acc = 0.99930241, valid acc = 0.97907950, iterations = 60
+Seed = 8, train acc = 0.99790722, valid acc = 0.98117155, iterations = 45
+Seed = 9, train acc = 0.99895361, valid acc = 0.97907950, iterations = 50
+Number hidden units = 70, train acc = 0.99965120, max valid acc = 0.98326360
+Seed = 0, train acc = 0.99860481, valid acc = 0.98012552, iterations = 45
+Seed = 1, train acc = 0.99825602, valid acc = 0.98012552, iterations = 40
+Seed = 2, train acc = 1.00000000, valid acc = 0.98012552, iterations = 50
+Seed = 3, train acc = 0.99965120, valid acc = 0.97907950, iterations = 55
+Seed = 4, train acc = 1.00000000, valid acc = 0.98012552, iterations = 50
+Seed = 5, train acc = 0.99965120, valid acc = 0.98221757, iterations = 50
+Seed = 6, train acc = 0.99895361, valid acc = 0.98117155, iterations = 50
+Seed = 7, train acc = 0.99895361, valid acc = 0.98012552, iterations = 45
+Seed = 8, train acc = 1.00000000, valid acc = 0.98117155, iterations = 55
+Seed = 9, train acc = 0.99860481, valid acc = 0.98117155, iterations = 45
+Number hidden units = 90, train acc = 0.99965120, max valid acc = 0.98221757
+Seed = 0, train acc = 0.99860481, valid acc = 0.97803347, iterations = 40
+Seed = 1, train acc = 1.00000000, valid acc = 0.98326360, iterations = 55
+Seed = 2, train acc = 0.99755842, valid acc = 0.97907950, iterations = 40
+Seed = 3, train acc = 0.99930241, valid acc = 0.97907950, iterations = 50
+Seed = 4, train acc = 1.00000000, valid acc = 0.97907950, iterations = 55
+Seed = 5, train acc = 0.99965120, valid acc = 0.98117155, iterations = 50
+Seed = 6, train acc = 0.99965120, valid acc = 0.97907950, iterations = 45
+Seed = 7, train acc = 0.99965120, valid acc = 0.98012552, iterations = 45
+Seed = 8, train acc = 0.99720963, valid acc = 0.97698745, iterations = 40
+Seed = 9, train acc = 0.99895361, valid acc = 0.98012552, iterations = 40
+Number hidden units = 110, train acc = 1.00000000, max valid acc = 0.98326360
+Seed = 0, train acc = 0.99965120, valid acc = 0.97907950, iterations = 45
+Seed = 1, train acc = 0.99860481, valid acc = 0.98012552, iterations = 45
+Seed = 2, train acc = 0.99965120, valid acc = 0.98117155, iterations = 40
+Seed = 3, train acc = 0.99755842, valid acc = 0.97907950, iterations = 35
+Seed = 4, train acc = 0.99965120, valid acc = 0.97803347, iterations = 50
+Seed = 5, train acc = 0.99965120, valid acc = 0.98012552, iterations = 50
+Seed = 6, train acc = 1.00000000, valid acc = 0.98012552, iterations = 50
+Seed = 7, train acc = 0.99965120, valid acc = 0.98117155, iterations = 50
+Seed = 8, train acc = 0.99965120, valid acc = 0.97907950, iterations = 40
+Seed = 9, train acc = 0.99930241, valid acc = 0.98012552, iterations = 45
+Number hidden units = 130, train acc = 0.99965120, max valid acc = 0.98117155
+Seed = 0, train acc = 0.99965120, valid acc = 0.97803347, iterations = 45
+Seed = 1, train acc = 1.00000000, valid acc = 0.98012552, iterations = 45
+Seed = 2, train acc = 0.99686083, valid acc = 0.97803347, iterations = 35
+Seed = 3, train acc = 0.99790722, valid acc = 0.97803347, iterations = 35
+Seed = 4, train acc = 0.99965120, valid acc = 0.97698745, iterations = 45
+Seed = 5, train acc = 0.99965120, valid acc = 0.98117155, iterations = 45
+Seed = 6, train acc = 0.99825602, valid acc = 0.98012552, iterations = 40
+Seed = 7, train acc = 0.99965120, valid acc = 0.97907950, iterations = 45
+Seed = 8, train acc = 0.99930241, valid acc = 0.98012552, iterations = 40
+Seed = 9, train acc = 0.99930241, valid acc = 0.97907950, iterations = 40
+Number hidden units = 150, train acc = 0.99965120, max valid acc = 0.98117155
+Seed = 0, train acc = 0.99895361, valid acc = 0.97907950, iterations = 35
+Seed = 1, train acc = 0.99930241, valid acc = 0.97907950, iterations = 40
+Seed = 2, train acc = 0.99930241, valid acc = 0.97803347, iterations = 40
+Seed = 3, train acc = 0.99930241, valid acc = 0.97907950, iterations = 35
+Seed = 4, train acc = 0.99895361, valid acc = 0.97907950, iterations = 35
+Seed = 5, train acc = 0.99755842, valid acc = 0.97803347, iterations = 35
+Seed = 6, train acc = 1.00000000, valid acc = 0.98117155, iterations = 40
+Seed = 7, train acc = 1.00000000, valid acc = 0.97907950, iterations = 45
+Seed = 8, train acc = 0.99930241, valid acc = 0.98012552, iterations = 35
+Seed = 9, train acc = 1.00000000, valid acc = 0.98012552, iterations = 45
+Number hidden units = 170, train acc = 1.00000000, max valid acc = 0.98117155
+Seed = 0, train acc = 0.99930241, valid acc = 0.98117155, iterations = 35
+Seed = 1, train acc = 0.99895361, valid acc = 0.97803347, iterations = 35
+Seed = 2, train acc = 0.99825602, valid acc = 0.97907950, iterations = 35
+Seed = 3, train acc = 0.99755842, valid acc = 0.97907950, iterations = 35
+Seed = 4, train acc = 1.00000000, valid acc = 0.97907950, iterations = 40
+Seed = 5, train acc = 0.99825602, valid acc = 0.98012552, iterations = 40
+Seed = 6, train acc = 0.99825602, valid acc = 0.97907950, iterations = 35
+Seed = 7, train acc = 0.99965120, valid acc = 0.97803347, iterations = 35
+Seed = 8, train acc = 0.99895361, valid acc = 0.97594142, iterations = 35
+Seed = 9, train acc = 0.99860481, valid acc = 0.98012552, iterations = 35
+Number hidden units = 190, train acc = 0.99930241, max valid acc = 0.98117155
+Number of seconds for training: 70
+Best MLP valid accuracy: 98.32635983%
+Best MLP:  MLPClassifier(hidden_layer_sizes=(50,), learning_rate_init=0.005,
+              random_state=6, shuffle=False)
+
+Mostremos estos resultados de forma gráfica, mediante este fragmento de código:
+
+
+```
+
+# Show results
+width = 4
+plt.bar(np.array(tests_n_hidden) - width, 100 *(1- np.array(accs_train)), color='g', width=width, label='Train error')
+plt.bar(np.array(tests_n_hidden), 100 *(1- np.array(accs_valid)), width=width, label='Min valid error')
+plt.xlabel('number of hidden units')
+plt.ylabel('error (%)')
+plt.xticks(np.array(tests_n_hidden), tests_n_hidden)
+plt.legend(loc='upper right')
+plt.show()
+
+```
+
+Obteniendo la siguiente gráfica:
+image%20%283%29.png
+
+ 
+
+Por tanto, vamos a sacar los resultados finales del mejor MLP, con el siguiente fragmento de código:
+
+
+```
+
+# Final results of best MLP
+# ------------
+print("Printing final results")
+
+predict_train = best_mlp.predict(input_train)
+predict_valid = best_mlp.predict(input_valid)
+predict_test = best_mlp.predict(input_test)
+
+print("Train accuracy: %.3f%%" % (accuracy_score(target_train, predict_train) * 100))
+print("Valid accuracy: %.3f%%" % (accuracy_score(target_valid, predict_valid) * 100))
+print("Test accuracy: %.3f%%" % (accuracy_score(target_test, predict_test) * 100))
+
+print("Train confusion matrix:")
+print(confusion_matrix(target_train, predict_train))
+print("Valid confusion matrix:")
+print(confusion_matrix(target_valid, predict_valid))
+print("Test confusion matrix:")
+print(confusion_matrix(target_test, predict_test))
+
+print("Train classification report:")
+print(classification_report(target_train, predict_train))
+print("Valid classification report:")
+print(classification_report(target_valid, predict_valid))
+print("Test classification report:")
+print(classification_report(target_test, predict_test))
+```
+
+Obteniendo los siguientes resultados:
+
+Printing final results
+Train accuracy: 99.965%
+Valid accuracy: 98.326%
+Test accuracy: 95.938%
+Train confusion matrix:
+[[275   0   0   0   0   0   0   0   0   0]
+ [  0 289   0   0   0   0   0   0   0   0]
+ [  0   0 284   0   0   0   0   0   0   0]
+ [  0   0   0 294   0   1   0   0   0   0]
+ [  0   0   0   0 299   0   0   0   0   0]
+ [  0   0   0   0   0 290   0   0   0   0]
+ [  0   0   0   0   0   0 281   0   0   0]
+ [  0   0   0   0   0   0   0 292   0   0]
+ [  0   0   0   0   0   0   0   0 281   0]
+ [  0   0   0   0   0   0   0   0   0 281]]
+Valid confusion matrix:
+[[99  0  1  0  0  0  1  0  0  0]
+ [ 0 98  0  0  0  0  0  2  0  0]
+ [ 0  0 95  0  0  0  0  0  1  0]
+ [ 0  0  0 94  0  0  0  0  0  0]
+ [ 0  0  0  0 87  0  1  0  0  0]
+ [ 0  0  0  1  0 83  0  0  0  2]
+ [ 0  1  0  0  0  0 95  0  0  0]
+ [ 0  0  0  0  0  0  0 95  0  0]
+ [ 0  1  0  0  1  0  0  0 97  0]
+ [ 0  0  0  2  1  0  0  0  1 97]]
+Test confusion matrix:
+[[176   0   0   0   0   2   0   0   0   0]
+ [  0 178   0   0   0   0   2   0   2   0]
+ [  0   4 170   0   0   0   1   0   2   0]
+ [  0   0   2 176   0   2   0   0   1   2]
+ [  0   1   0   0 176   0   0   1   3   0]
+ [  0   0   1   0   0 177   0   0   0   4]
+ [  0   1   0   0   2   0 177   0   1   0]
+ [  0   0   0   0   1   5   0 164   1   8]
+ [  0   8   0   1   0   2   0   0 154   9]
+ [  0   0   0   0   0   2   0   0   2 176]]
+Train classification report:
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00       275
+           1       1.00      1.00      1.00       289
+           2       1.00      1.00      1.00       284
+           3       1.00      1.00      1.00       295
+           4       1.00      1.00      1.00       299
+           5       1.00      1.00      1.00       290
+           6       1.00      1.00      1.00       281
+           7       1.00      1.00      1.00       292
+           8       1.00      1.00      1.00       281
+           9       1.00      1.00      1.00       281
+
+    accuracy                           1.00      2867
+   macro avg       1.00      1.00      1.00      2867
+weighted avg       1.00      1.00      1.00      2867
+
+Valid classification report:
+              precision    recall  f1-score   support
+
+           0       1.00      0.98      0.99       101
+           1       0.98      0.98      0.98       100
+           2       0.99      0.99      0.99        96
+           3       0.97      1.00      0.98        94
+           4       0.98      0.99      0.98        88
+           5       1.00      0.97      0.98        86
+           6       0.98      0.99      0.98        96
+           7       0.98      1.00      0.99        95
+           8       0.98      0.98      0.98        99
+           9       0.98      0.96      0.97       101
+
+    accuracy                           0.98       956
+   macro avg       0.98      0.98      0.98       956
+weighted avg       0.98      0.98      0.98       956
+
+Test classification report:
+              precision    recall  f1-score   support
+
+           0       1.00      0.99      0.99       178
+           1       0.93      0.98      0.95       182
+           2       0.98      0.96      0.97       177
+           3       0.99      0.96      0.98       183
+           4       0.98      0.97      0.98       181
+           5       0.93      0.97      0.95       182
+           6       0.98      0.98      0.98       181
+           7       0.99      0.92      0.95       179
+           8       0.93      0.89      0.91       174
+           9       0.88      0.98      0.93       180
+
+    accuracy                           0.96      1797
+   macro avg       0.96      0.96      0.96      1797
+weighted avg       0.96      0.96      0.96      1797
+
+Veamos ahora la curva ROC que genera este MLP, mediante el siguiente código:
+
+
+```
+
+# ROC curves of test set
+mlp_probs = mlp.predict_proba(input_test)
+classes = np.unique(target_train)
+mlp_auc = []
+mlp_fpr = []
+mlp_tpr = []
+for cla in classes:
+mlp_auc.append(roc_auc_score(target_test==cla, mlp_probs[:,cla]))
+fpr, tpr, _ = roc_curve(target_test==cla, mlp_probs[:,cla])
+mlp_fpr.append(fpr)
+mlp_tpr.append(tpr)
+
+print("Printing ROC curves of test set")
+# plot the roc curve for the model
+for cla in classes:
+# plt.plot(ns_fpr, ns_tpr, linestyle='--', label='No Skill')
+plt.plot(mlp_fpr[cla], mlp_tpr[cla], marker='.', label='Class %d (AUC: %.5f)' % (cla, mlp_auc[cla]))
+
+# axis labels
+plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+# show the legend
+plt.legend()
+# show the plot
+plt.show()
+```
+
+Obteniendo el siguiente resultado, observando que la predicción del '8' es la peor:
+image%20%284%29.png
+
+Por ello vamos a mostrar los errores que se estan cometiendo con este, haciendo uso del siguiente fragmento de código:
+
+
+```
+
+# Show errors on real class 8
+real_class = 8
+indxs = np.where(digits_test.target == real_class)[0]
+indxs_err = indxs[(np.where(predict_test[(indxs)] != real_class)[0])]
+preds_err = predict_test[(indxs_err)]
+n_img_plt = 8
+
+print("Showing first %d errors of real class %d" % (n_img_plt, real_class))
+
+_, axes = plt.subplots(2, n_img_plt//2)
+images_and_labels = list(zip(digits_test.images[(indxs_err)], digits_test.target[(indxs_err)], preds_err))
+for ax, (image, label1, label2) in zip(np.concatenate(axes), images_and_labels):
+ax.set_axis_off()
+ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
+ax.set_title('real:%i pred:%i' % (label1, label2))
+
+plt.show()
+```
+
+Obteniendo los siguientes resultados, que muestran claros indicios de el error que se muestra previamente:
+
+image%20%285%29.png
